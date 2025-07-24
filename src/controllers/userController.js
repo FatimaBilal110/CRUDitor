@@ -1,80 +1,59 @@
-const fs = require('fs');
-const path = require('path');
+const mongodb = require('mongodb');
+const ObjectId = mongodb.ObjectId;
+const connectDB = require('../db/mongo');
 
-const userFile = path.join(__dirname, '../../user.json');
-let users = JSON.parse(fs.readFileSync(userFile , 'utf-8'));
-
-function saveUsers() {
-  fs.writeFileSync(userFile, JSON.stringify(users , null, 2));
-}
-
-exports.listOfUsers = (req, res) => {
+exports.listOfUsers = async (req, res) => {
+  const db = await connectDB();
+  const users = await db.collection('users').find().toArray();
   res.json(users);
 };
 
-exports.userById = (req, res) => {
-let id = req.params.id
+exports.userById = async (req, res) => {
+  const db = await connectDB();
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid User ID" });
+  }
 
-    let index = users.findIndex((user)=>{
-        return (user.id == Number.parseInt(id))
-    })
-    if (index >= 0){
-        let std = users[index]
-        res.json(std)
-    }
-    else{
-        return res.status(404).json("User Not Found")
+  try {
+    const user = await db.collection('users').findOne({ _id: new ObjectId(id) });
+
+    if (!user) {
+      return res.status(404).json({ message: "User Not Found" });
     }
 
+    return res.json(user);
+  } catch (error) {
+    return res.status(500).json({ message: "Server Error", error: error.message });
+  }
 };
 
-exports.createUser = (req, res) => {
-    const add ={
-        id: users.length + 1,
-        Name: req.body.Name,
-        email: req.body.email
-    }
 
-    users.push(add)
-    saveUsers()
-    res.json (add)
+exports.createUser = async (req, res) => {
+  const db = await connectDB();
+  const { Name, email } = req.body;
+  const result = await db.collection('users').insertOne({ Name, email });
+
+  res.json({ _id: result.insertedId, Name, email });
 };
 
-exports.updateUser = (req, res) => {
- let id = req.params.id
-    let Name = req.body.Name
-    let email = req.body.email
-    
-    let index = users.findIndex((user)=>{
-        return (user.id == Number.parseInt(id))
-     })
-     if (index >= 0){
-        let std = users[index]
-        std.Name = Name
-        std.email = email
-        saveUsers()
-        res.json(std)
-     }
-     else{
-        return res.status(404).json("User Not Found")
-     }
+exports.updateUser = async (req, res) => {
+  const db = await connectDB();
+  const { Name, email } = req.body;
+  const result = await db.collection('users').findOneAndUpdate(
+    { _id: new ObjectId(req.params.id) },
+    { $set: { Name, email } },
+    { returnDocument: 'after' }
+  );
 
+  if (!result.value) return res.status(404).json("User Not Found");
+  res.json(result.value);
 };
 
-exports.deleteUser = (req, res) => {
- let id = req.params.id
-  let index = users.findIndex((user)=>{
-        return (user.id == Number.parseInt(id))
-     })
+exports.deleteUser = async (req, res) => {
+  const db = await connectDB();
+  const result = await db.collection('users').findOneAndDelete({ _id: new ObjectId(req.params.id) });
 
-     if (index >= 0){
-        let std = users[index]
-        users.splice (index , 1)
-        saveUsers()
-        res.json(std)
-     }
-  else{
-    return res.status(404).json("User Not Found")
-    }
-
+  if (!result.value) return res.status(404).json("User Not Found");
+  res.json(result.value);
 };
