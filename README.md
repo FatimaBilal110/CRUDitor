@@ -1,6 +1,6 @@
 # User CRUD API
 
-A basic API built with Node.js and Express to manage users. This application supports CRUD (Create, Read, Update, Delete) operations with user data stored in a local JSON file.
+A basic API built with Node.js and Express to manage users. MongoDB is used as the backend database. This application supports CRUD (Create, Read, Update, Delete) operations for user data.
 
 ---
 
@@ -9,8 +9,9 @@ A basic API built with Node.js and Express to manage users. This application sup
 ```
 ├── server.js                   
 │
-├── user.json
 ├── src/
+│   ├── db/
+│   │   └── mongo.js  
 │   ├── routes/
 │   │   └── userRoutes.js       
 │   │
@@ -27,7 +28,7 @@ A basic API built with Node.js and Express to manage users. This application sup
 - Create a new user
 - Update user by ID
 - Delete user by ID
-- Data stored in a local JSON file (no external database)
+- Data is persisted using MongoDB
 
 ---
 
@@ -35,7 +36,8 @@ A basic API built with Node.js and Express to manage users. This application sup
 
 - Node.js
 - Express
-- File system module (`fs`) for data persistence
+- MongoDB (for database and data persistence)
+- MongoDB Node.js Driver
 
 ---
 
