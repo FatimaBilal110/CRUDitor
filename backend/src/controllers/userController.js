@@ -1,5 +1,4 @@
-const mongodb = require('mongodb');
-const ObjectId = mongodb.ObjectId;
+const {ObjectId} = require('mongodb');
 const connectDB = require('../db/mongo');
 
 exports.listOfUsers = async (req, res) => {
@@ -40,20 +39,48 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   const db = await connectDB();
   const { Name, email } = req.body;
-  const result = await db.collection('users').findOneAndUpdate(
-    { _id: new ObjectId(req.params.id) },
-    { $set: { Name, email } },
-    { returnDocument: 'after' }
-  );
+  const userId = req.params.id;
 
-  if (!result.value) return res.status(404).json("User Not Found");
-  res.json(result.value);
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: "Invalid User ID" });
+  }
+
+  try {
+    const result = await db.collection('users').updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { Name, email } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "User Not Found" });
+    }
+
+    return res.status(200).json({ message: "User Updated Successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Update Failed", error: error.message });
+  }
 };
+
 
 exports.deleteUser = async (req, res) => {
   const db = await connectDB();
-  const result = await db.collection('users').findOneAndDelete({ _id: new ObjectId(req.params.id) });
+  const userId = req.params.id;
 
-  if (!result.value) return res.status(404).json("User Not Found");
-  res.json(result.value);
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: "Invalid User ID" });
+  }
+
+  try {
+    const result = await db.collection('users').findOneAndDelete({
+      _id: new ObjectId(userId),
+    });
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "User Not Found" });
+    }
+
+    return res.status(200).json({ message: "User deleted" });
+  } catch (error) {
+    return res.status(500).json({ message: "deletion Failed", error: error.message });
+  }
 };
