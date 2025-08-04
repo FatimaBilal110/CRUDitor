@@ -166,8 +166,8 @@ const closeModal = () => {
           </tbody>
         </table>
       </div>
+
       
-                 {/* MODAL-user detail by id */}
      {ModalOpen && selectedUser && (
     <div className="fixed top-0 right-0 rounded-2xl h-full bg-white p-6 text-black">
       <button onClick={() => setModalOpen(false)} className="absolute top-4 right-4 text-red-600 text-lg font-bold">✕</button>
