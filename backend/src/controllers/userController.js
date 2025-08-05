@@ -3,8 +3,25 @@ const connectDB = require('../db/mongo');
 
 exports.listOfUsers = async (req, res) => {
   const db = await connectDB();
-  const users = await db.collection('users').find().toArray();
-  res.json(users);
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 5;
+  const skip = (page - 1) * limit;
+
+  try {
+    const users = await db.collection('users')
+      .find()
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const totalUsers = await db.collection('users').countDocuments();
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    res.json({ users, totalUsers, totalPages, currentPage: page });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch users", error: error.message });
+  }
 };
 
 exports.userById = async (req, res) => {

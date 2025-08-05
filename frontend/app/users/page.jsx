@@ -2,6 +2,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import UserItem from './UserItem';
+import Modal from './Modal';
+import ViewUserModal from './ViewUserModal';
+import EditUserModal from './EditUserModal';
+import CreateUserModal from './CreateUserModal';
+import DeleteUserModal from './DeleteUserModal';
+
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
@@ -9,40 +16,43 @@ export default function UsersPage() {
   const [modalType, setModalType] = useState(null); 
   const [ModalOpen, setModalOpen] = useState(false);
   const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 5; 
 
+
+    const fetchUsers = async (page = 1) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    setError('No token found. Please log in.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`http://localhost:5000/user/list?page=${page}&limit=${pageSize}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      setError('Unauthorized or token expired');
+      return;
+    }
+
+    const data = await res.json();
+    setUsers(data.users);
+    setTotalPages(data.totalPages);
+    setCurrentPage(data.currentPage);
+  } catch (err) {
+    setError('Failed to fetch users');
+  }
+};
   useEffect(() => {
-    const fetchUsers = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('No token found. Please log in.');
-        return;
-      }
+  fetchUsers(currentPage);
+}, [currentPage]);
 
-      try {
-        const res = await fetch('http://localhost:5000/user/list', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
 
-        if (!res.ok) {
-          setError('Unauthorized or token expired');
-          return;
-        }
-
-        const data = await res.json();
-        setUsers(data);
-      } catch (err) {
-        setError('Failed to fetch users');
-      }
-    };
-
-    fetchUsers();
-  }, []);
-
-  const handleCreateClick = () => {
-    router.push('/users/create');
-  };
 
   const openModal = async (userId, type) => {
   const token = localStorage.getItem('token');
@@ -52,8 +62,6 @@ export default function UsersPage() {
     const res = await fetch(`http://localhost:5000/user/${userId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    if (!res.ok) throw new Error('Failed to fetch user details');
 
     const data = await res.json();
     setSelectedUser(data);
@@ -68,6 +76,40 @@ export default function UsersPage() {
   const { name, value } = e.target;
   setSelectedUser(prev => ({ ...prev, [name]: value }));
 };
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const token = localStorage.getItem('token');
+
+  try {
+    const response = await fetch('http://localhost:5000/user/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        Name: selectedUser.Name,
+        email: selectedUser.email,
+        password: selectedUser.password,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setUsers(prev => [...prev, data]);
+      closeModal();
+      fetchUsers(1)
+    } else {
+      setError(data.message || 'Signup failed');
+    }
+  } catch (err) {
+    console.error('Error creating user:', err);
+    setError('Failed to create user');
+  }
+};
+
 
 const handleEditSubmit = async (e) => {
   e.preventDefault();
@@ -84,6 +126,11 @@ const handleEditSubmit = async (e) => {
     });
 
     if (!res.ok) throw new Error('Update failed');
+
+    setUsers(prev => prev.map(user =>
+  user._id === selectedUser._id ? selectedUser : user
+));
+
     setModalType('view');
   } catch (err) {
     console.error('Error updating user:', err);
@@ -103,7 +150,12 @@ const handleDeleteConfirm = async () => {
 
     if (!res.ok) throw new Error('Delete failed');
 
+    setUsers(prev => prev.filter(user => user._id !== selectedUser._id));
+
     closeModal();
+      const updatedPage = currentPage;
+    await fetchUsers(updatedPage);
+
   } 
   catch (err) {
   console.error('Error deleting user:', err);
@@ -116,17 +168,17 @@ const closeModal = () => {
   setSelectedUser(null);
 };
 
-  return (
-    <div className="min-h-screen w-full p-6 bg-cover bg-center" 
-    style={{ backgroundImage: "url('/userbg.jpeg')" }}>
-
-      {/* Main Heading-list of users */}
+ return (
+    <div className="min-h-screen w-full p-6 bg-cover bg-center" style={{ backgroundImage: "url('/userbg.jpeg')" }}>
       <h2 className="text-4xl font-bold mb-6 text-center text-green-950">User List</h2>
-      <div className='flex justify-end px-4'>
 
-         {/* create button */}
+      <div className='flex justify-end px-4'>
         <button
-          onClick={handleCreateClick}
+          onClick={() => {
+            setModalType('create');
+            setSelectedUser({ Name: '', email: '', password: '' });
+            setModalOpen(true);
+          }}
           className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
         >
           +Create User
@@ -139,109 +191,56 @@ const closeModal = () => {
         <table className="table-auto min-w-full bg-white rounded-md shadow-md">
           <thead className="bg-green-700 text-white">
             <tr>
-              <th className="px-6 text-left py-3">ID</th>
-              <th className="px-6 text-left py-3">Name</th>
-              <th className="px-6 text-left py-3">Email</th>
-              <th className="px-6 text-left py-3">Actions</th>
+              <th className="px-6 py-3 text-left">ID</th>
+              <th className="px-6 py-3 text-left">Name</th>
+              <th className="px-6 py-3 text-left">Email</th>
+              <th className="px-6 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {users.map(user => (
-              <tr key={user._id} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm text-gray-800">{user._id}</td>
-                <td className="px-6 py-4 text-sm text-gray-800">{user.Name}</td>
-                <td className="px-6 py-4 text-sm text-gray-800">{user.email}</td>
-                <td className="px-6 py-4">
-
-                   {/* view button */}
-                <button
-                  onClick={() => openModal(user._id, 'view')}
-                  className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700"
->                  View
-                </button>
-
-                </td>
-              </tr>
+              <UserItem key={user._id} user={user} onView={() => openModal(user._id, 'view')} />
             ))}
           </tbody>
         </table>
-      </div>
+        <div className="flex justify-center mt-4 space-x-4">
 
-      
-     {ModalOpen && selectedUser && (
-    <div className="fixed top-0 right-0 rounded-2xl h-full bg-white p-6 text-black">
-      <button onClick={() => setModalOpen(false)} className="absolute top-4 right-4 text-red-600 text-lg font-bold">✕</button>
+  <button
+    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+    disabled={currentPage === 1}
+    className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
+  >
+    Previous
+  </button>
 
-      {modalType === 'view' && (
-        <div className='space-y-3'>
-            <h3 className="text-xl font-semibold">User Details</h3>
-        <div className="space-y-3">
-          <p><strong>ID:</strong> {selectedUser._id}</p>
-          <p><strong>Name:</strong> {selectedUser.Name}</p>
-          <p><strong>Email:</strong> {selectedUser.email}</p>
+  <span className="text-green-900 font-semibold pt-2">Page {currentPage} of {totalPages}</span>
 
-          <div className="mt-6 flex justify-center gap-6">
-            <button onClick={() => setModalType('edit')} title="Edit">
-              <img src="/edit.png" alt="Edit" className="h-9 w-9" />
-            </button>
-            <button onClick={() => setModalType('delete')} title="Delete">
-              <img src="/delete.png" alt="Delete" className="h-12 w-12" />
-            </button>
-          </div>
-        </div>
-        </div>
-      )}
+  <button
+    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+    disabled={currentPage === totalPages}
+    className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
+  >
+    Next
+  </button>
+</div>
+</div>
+    
 
-      {modalType === 'edit' && (
-        <form onSubmit={handleEditSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium">Name</label>
-            <input
-              name="Name"
-              value={selectedUser.Name}
-              onChange={handleInputChange}
-              className="w-full border px-3 py-2 rounded"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Email</label>
-            <input
-              name="email"
-              type="email"
-              value={selectedUser.email}
-              onChange={handleInputChange}
-              className="w-full border px-3 py-2 rounded"
-              required
-            />
-          </div>
-          <div className="flex justify-between mt-4">
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
-              Save
-            </button>
-            <button type="button" onClick={() => setModalType('view')} className="text-gray-600 px-4 py-2">
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {modalType === 'delete' && (
-        <div className="space-y-1">
-          <div className='py-7'>
-          <p>Are you sure you want to delete <strong>{selectedUser.Name}</strong>?</p>
-          </div>
-          <div className="flex justify-between">
-            <button onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
-              Confirm Delete
-            </button>
-            <button onClick={() => setModalType('view')} className="text-gray-600 px-4 py-2">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      {ModalOpen && (
+        <Modal onClose={closeModal}>
+          {modalType === 'view' && (
+            <ViewUserModal user={selectedUser} onEdit={() => setModalType('edit')} onDelete={() => setModalType('delete')} />
+          )}
+          {modalType === 'edit' && (
+            <EditUserModal user={selectedUser} onChange={handleInputChange} onSubmit={handleEditSubmit} onCancel={() => setModalType('view')} />
+          )}
+          {modalType === 'create' && (
+            <CreateUserModal user={selectedUser} onChange={handleInputChange} onSubmit={handleSubmit} onCancel={closeModal} />
+          )}
+          {modalType === 'delete' && (
+            <DeleteUserModal user={selectedUser} onDelete={handleDeleteConfirm} onCancel={() => setModalType('view')} />
+          )}
+        </Modal>
       )}
     </div>
   );
