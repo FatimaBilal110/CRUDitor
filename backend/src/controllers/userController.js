@@ -47,15 +47,37 @@ exports.userById = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   const db = await connectDB();
-  const { Name, email } = req.body;
-  const result = await db.collection('users').insertOne({ Name, email });
+  const { Name, email, password } = req.body;
 
-  res.json({ _id: result.insertedId, Name, email });
-};
+  // Handle uploaded file
+  let image = null;
+  if (req.file) {
+    image = `/uploads/${req.file.filename}`;
+  }
+
+  try {
+    const result = await db.collection('users').insertOne({ Name, email, password, image });
+
+    res.json({
+      _id: result.insertedId,
+      Name,
+      email,
+      password,
+      image
+    });
+  } catch (error) {
+    res.status(500).json({ message: "User creation failed", error: error.message });
+  }
+}
 
 exports.updateUser = async (req, res) => {
   const db = await connectDB();
-  const { Name, email } = req.body;
+ const { Name, email } = req.body;
+let image = req.body.image;
+
+if (req.file) {
+  image = `/uploads/${req.file.filename}`;
+}
   const userId = req.params.id;
 
   if (!ObjectId.isValid(userId)) {
@@ -65,7 +87,7 @@ exports.updateUser = async (req, res) => {
   try {
     const result = await db.collection('users').updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { Name, email } }
+      { $set: { Name, email, image } }
     );
 
     if (result.matchedCount === 0) {

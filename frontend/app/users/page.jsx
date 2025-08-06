@@ -77,30 +77,29 @@ export default function UsersPage() {
   setSelectedUser(prev => ({ ...prev, [name]: value }));
 };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+const handleSubmit = async (formDataFromModal) => {
   const token = localStorage.getItem('token');
+
+  const formData = new FormData();
+  formData.append('Name', formDataFromModal.Name);
+  formData.append('email', formDataFromModal.email);
+  formData.append('password', formDataFromModal.password);
+  formData.append('image', formDataFromModal.image);
 
   try {
     const response = await fetch('http://localhost:5000/user/create', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        Name: selectedUser.Name,
-        email: selectedUser.email,
-        password: selectedUser.password,
-      }),
+      body: formData,
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      setUsers(prev => [...prev, data]);
       closeModal();
-      fetchUsers(1)
+      fetchUsers(1); // refresh
     } else {
       setError(data.message || 'Signup failed');
     }
@@ -110,32 +109,40 @@ const handleSubmit = async (e) => {
   }
 };
 
-
-const handleEditSubmit = async (e) => {
-  e.preventDefault();
+const handleEditSubmit = async (formDataFromModal) => {
   const token = localStorage.getItem('token');
+
+  const formData = new FormData();
+  formData.append('Name', formDataFromModal.Name);
+  formData.append('email', formDataFromModal.email);
+  if (formDataFromModal.password) {
+    formData.append('password', formDataFromModal.password);
+  }
+  if (formDataFromModal.image instanceof File) {
+    formData.append('image', formDataFromModal.image);
+  }
 
   try {
     const res = await fetch(`http://localhost:5000/user/update/${selectedUser._id}`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(selectedUser),
+      body: formData,
     });
 
     if (!res.ok) throw new Error('Update failed');
 
-    setUsers(prev => prev.map(user =>
-  user._id === selectedUser._id ? selectedUser : user
-));
+    const updated = await res.json();
+              await fetchUsers(1);
 
     setModalType('view');
   } catch (err) {
     console.error('Error updating user:', err);
   }
 };
+
+
 
 const handleDeleteConfirm = async () => {
   const token = localStorage.getItem('token');
@@ -176,7 +183,7 @@ const closeModal = () => {
         <button
           onClick={() => {
             setModalType('create');
-            setSelectedUser({ Name: '', email: '', password: '' });
+            setSelectedUser({ Name: '', email: '', password: '', image:'' });
             setModalOpen(true);
           }}
           className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
@@ -191,6 +198,7 @@ const closeModal = () => {
         <table className="table-auto min-w-full bg-white rounded-md shadow-md">
           <thead className="bg-green-700 text-white">
             <tr>
+              <th className="px-6 py-3 text-left">Image</th>
               <th className="px-6 py-3 text-left">ID</th>
               <th className="px-6 py-3 text-left">Name</th>
               <th className="px-6 py-3 text-left">Email</th>

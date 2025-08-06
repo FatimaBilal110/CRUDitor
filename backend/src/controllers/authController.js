@@ -8,23 +8,26 @@ exports.register = async (req, res) => {
   const db = await connectDB();
   const { name, email, password } = req.body;
 
-  if (!name || !email || !password)
+  if (!name || !email || !password) {
     return res.status(400).json({ message: "All fields are required" });
+  }
 
   const existingUser = await db.collection('users').findOne({ email });
-  if (existingUser)
-    return res.status(400).json({ message: "User already exist" });
+  if (existingUser) {
+    return res.status(400).json({ message: "User already exists" });
+  }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const result = await db.collection('users').insertOne({
+  await db.collection('users').insertOne({
     Name: name,
     email,
     password: hashedPassword
   });
 
-  res.status(201).json({ message: "User registered", userId: result.insertedId });
+  res.status(201).json({ message: 'User registered successfully' });
 };
+
 
 exports.login = async (req, res) => {
   const db = await connectDB();
